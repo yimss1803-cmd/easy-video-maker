@@ -45,6 +45,69 @@
     <!-- 2단계: 설정 -->
     <section class="card">
       <h2><span class="step">2</span> 동영상 설정</h2>
+
+      <!-- 스마트 프리셋 -->
+      <div class="preset-section">
+        <div class="preset-header">
+          <span class="preset-label">🎨 스마트 프리셋 <span class="hint-badge">원클릭 자동설정</span></span>
+          <select id="presetDuration" class="preset-duration-select">
+            <option value="30">30초</option>
+            <option value="60">1분</option>
+            <option value="120">2분</option>
+            <option value="180" selected>3분 🎬</option>
+            <option value="300">5분</option>
+          </select>
+        </div>
+        <div class="preset-buttons">
+          <button class="preset-btn" data-preset="car" title="차량 변신 · 모션블러 + 모프블렌드">
+            <span class="preset-icon">🚗</span>
+            <span class="preset-name">차 변신</span>
+            <span class="preset-desc">달리면서 변신</span>
+          </button>
+          <button class="preset-btn" data-preset="travel" title="여행 추억 · 페이드 + 켄번즈">
+            <span class="preset-icon">✈️</span>
+            <span class="preset-name">여행 추억</span>
+            <span class="preset-desc">부드러운 페이드</span>
+          </button>
+          <button class="preset-btn" data-preset="birthday" title="생일/파티 · 플래시 + 줌">
+            <span class="preset-icon">🎂</span>
+            <span class="preset-name">생일/파티</span>
+            <span class="preset-desc">활기찬 플래시</span>
+          </button>
+          <button class="preset-btn" data-preset="wedding" title="웨딩/프로포즈 · 원형마스크 + 페이드">
+            <span class="preset-icon">💍</span>
+            <span class="preset-name">웨딩/감성</span>
+            <span class="preset-desc">로맨틱한 연출</span>
+          </button>
+          <button class="preset-btn" data-preset="scifi" title="SF/게임 · 글리치 + 픽셀디졸브">
+            <span class="preset-icon">🤖</span>
+            <span class="preset-name">SF/게임</span>
+            <span class="preset-desc">디지털 변신</span>
+          </button>
+          <button class="preset-btn" data-preset="morph" title="변신 쇼케이스 · 모프 + 워프">
+            <span class="preset-icon">✨</span>
+            <span class="preset-name">변신 쇼</span>
+            <span class="preset-desc">고무처럼 변형</span>
+          </button>
+          <button class="preset-btn" data-preset="sports" title="스포츠/액션 · 모션블러 + 글리치">
+            <span class="preset-icon">⚽</span>
+            <span class="preset-name">스포츠</span>
+            <span class="preset-desc">역동적 액션</span>
+          </button>
+          <button class="preset-btn" data-preset="pet" title="반려동물 · 줌 + 페이드">
+            <span class="preset-icon">🐶</span>
+            <span class="preset-name">반려동물</span>
+            <span class="preset-desc">귀여운 줌인</span>
+          </button>
+          <button class="preset-btn preset-btn-random" data-preset="random" title="매번 다른 효과로 재미있게">
+            <span class="preset-icon">🎲</span>
+            <span class="preset-name">랜덤 믹스</span>
+            <span class="preset-desc">매번 새롭게</span>
+          </button>
+        </div>
+        <p class="preset-hint">💡 프리셋을 누르면 <strong>전환효과·시간·켄번즈</strong>가 자동 설정되고, 사진 길이에 맞춰 시간이 균등 분배돼요!</p>
+      </div>
+
       <div class="settings-grid">
         <label class="setting">
           <span>사진당 표시 시간</span>

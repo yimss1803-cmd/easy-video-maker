@@ -70,6 +70,183 @@ clearAllBtn.addEventListener('click', () => {
   }
 });
 
+// ============================================================
+// 🎨 스마트 프리셋
+// ============================================================
+
+/**
+ * 프리셋 정의
+ * - transition: 기본 전환 효과
+ * - transitionPool: 랜덤으로 돌아가면서 사용할 전환 풀 (선택)
+ * - kenBurns: 켄번즈 효과 on/off
+ * - bgColor: 배경색
+ * - description: 설명
+ */
+const PRESETS = {
+  car: {
+    name: '🚗 차 변신',
+    transition: 'motionblur',
+    transitionPool: ['motionblur', 'morph', 'motionblur', 'warp'],
+    kenBurns: true,
+    bgColor: '#0a0a0a',
+    description: '차량이 달리면서 자연스럽게 변신하는 효과',
+  },
+  travel: {
+    name: '✈️ 여행 추억',
+    transition: 'fade',
+    transitionPool: ['fade', 'zoom', 'fade', 'circle'],
+    kenBurns: true,
+    bgColor: '#1a1a2e',
+    description: '부드러운 페이드와 켄번즈로 추억을 아련하게',
+  },
+  birthday: {
+    name: '🎂 생일/파티',
+    transition: 'flash',
+    transitionPool: ['flash', 'zoom', 'flash', 'slide'],
+    kenBurns: true,
+    bgColor: '#2d1b3d',
+    description: '번쩍이는 플래시와 활기찬 줌인',
+  },
+  wedding: {
+    name: '💍 웨딩/감성',
+    transition: 'circle',
+    transitionPool: ['circle', 'fade', 'circle', 'zoom'],
+    kenBurns: true,
+    bgColor: '#2a1f1f',
+    description: '원형 마스크로 로맨틱하게',
+  },
+  scifi: {
+    name: '🤖 SF/게임',
+    transition: 'glitch',
+    transitionPool: ['glitch', 'pixelate', 'glitch', 'warp'],
+    kenBurns: false,
+    bgColor: '#000000',
+    description: '디지털 왜곡과 픽셀 디졸브',
+  },
+  morph: {
+    name: '✨ 변신 쇼',
+    transition: 'morph',
+    transitionPool: ['morph', 'warp', 'morph', 'pixelate'],
+    kenBurns: true,
+    bgColor: '#0f0f1e',
+    description: '부드러운 모프 블렌드와 고무같은 워프',
+  },
+  sports: {
+    name: '⚽ 스포츠',
+    transition: 'motionblur',
+    transitionPool: ['motionblur', 'glitch', 'flash', 'slide'],
+    kenBurns: true,
+    bgColor: '#0d1f0d',
+    description: '역동적인 모션블러와 번쩍이는 플래시',
+  },
+  pet: {
+    name: '🐶 반려동물',
+    transition: 'zoom',
+    transitionPool: ['zoom', 'fade', 'circle', 'zoom'],
+    kenBurns: true,
+    bgColor: '#1e1a0e',
+    description: '귀여운 줌인과 페이드',
+  },
+  random: {
+    name: '🎲 랜덤 믹스',
+    transition: 'fade',
+    transitionPool: ['fade', 'morph', 'motionblur', 'warp', 'pixelate', 'glitch', 'flash', 'circle', 'zoom', 'slide'],
+    kenBurns: true,
+    bgColor: '#000000',
+    description: '매번 다른 전환 효과로 재미있게',
+  },
+};
+
+/**
+ * 프리셋 적용 - 사진 갯수에 맞춰 목표 시간을 균등 분배
+ */
+function applyPreset(presetKey) {
+  const preset = PRESETS[presetKey];
+  if (!preset) return;
+
+  if (state.slides.length < 2) {
+    showToast('⚠️ 프리셋을 적용하려면 <strong>사진을 2장 이상</strong> 먼저 추가해주세요!', 'warn');
+    return;
+  }
+
+  // 목표 시간 (초)
+  const targetDuration = parseInt($('presetDuration').value, 10);
+  const n = state.slides.length;
+
+  // 각 슬라이드 시간 계산 (소수 첫째자리로 반올림)
+  let perSlide = targetDuration / n;
+  // 너무 짧거나 길지 않게 제한 (1초 ~ 10초)
+  perSlide = Math.max(1, Math.min(10, perSlide));
+  // 슬라이더에 맞게 0.5초 단위로 반올림
+  perSlide = Math.round(perSlide * 2) / 2;
+
+  // 시간 설정 업데이트
+  durationEl.value = perSlide;
+  durationValue.textContent = `${perSlide}초`;
+
+  // 전환 효과 설정
+  transitionEl.value = preset.transition;
+
+  // 켄번즈 설정
+  kenBurnsEl.checked = preset.kenBurns;
+
+  // 배경색 설정
+  bgColorEl.value = preset.bgColor;
+
+  // 랜덤/풀 전환: slide별로 다른 전환 효과를 저장해두고 렌더링에 활용
+  if (preset.transitionPool && preset.transitionPool.length > 1) {
+    state.transitionOverrides = {};
+    for (let i = 0; i < n - 1; i++) {
+      if (presetKey === 'random') {
+        // 완전 랜덤
+        const pool = preset.transitionPool;
+        state.transitionOverrides[i] = pool[Math.floor(Math.random() * pool.length)];
+      } else {
+        // 순환 패턴 (좀 더 예측 가능)
+        state.transitionOverrides[i] = preset.transitionPool[i % preset.transitionPool.length];
+      }
+    }
+  } else {
+    state.transitionOverrides = null;
+  }
+
+  updateSlideInfo();
+  drawIdle();
+
+  // 예상 길이 계산
+  const actualTotal = perSlide * n;
+  const min = Math.floor(actualTotal / 60);
+  const sec = Math.round(actualTotal % 60);
+  const timeStr = min > 0 ? `${min}분 ${sec}초` : `${sec}초`;
+
+  showToast(
+    `✅ <strong>${preset.name}</strong> 프리셋 적용!<br>
+     <small>• ${preset.description}<br>
+     • 사진 ${n}장 × ${perSlide}초 = <strong>${timeStr}</strong><br>
+     ${preset.transitionPool ? `• 전환효과: ${preset.transitionPool.length}가지 순환` : ''}</small>`,
+    'success'
+  );
+}
+
+// 프리셋 버튼 이벤트 바인딩
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const preset = btn.dataset.preset;
+    // 선택 효과
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyPreset(preset);
+  });
+});
+
+// 목표 시간 변경 시 현재 프리셋 재적용
+$('presetDuration').addEventListener('change', () => {
+  const activeBtn = document.querySelector('.preset-btn.active');
+  if (activeBtn) {
+    applyPreset(activeBtn.dataset.preset);
+  }
+});
+
 resolutionEl.addEventListener('change', () => {
   const [w, h] = resolutionEl.value.split('x').map(Number);
   canvas.width = w;
@@ -432,6 +609,12 @@ titleText.addEventListener('input', drawIdle);
 titleColor.addEventListener('input', drawIdle);
 titlePosition.addEventListener('change', drawIdle);
 
+// 전환효과를 수동으로 바꾸면 프리셋 override 해제
+transitionEl.addEventListener('change', () => {
+  state.transitionOverrides = null;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+});
+
 /**
  * 개별 슬라이드를 canvas에 object-fit: contain 방식으로 그림
  * @param {object} slide
@@ -544,11 +727,18 @@ function renderFrameAt(t) {
   drawBg();
   if (state.slides.length === 0) return;
 
-  const { perSlide, transitionDur, transition } = getDurations();
+  const { perSlide } = getDurations();
   const n = state.slides.length;
   const slideIdx = Math.min(Math.floor(t / perSlide), n - 1);
   const localT = t - slideIdx * perSlide;
   const progress = localT / perSlide;
+
+  // 이 슬라이드의 전환효과 결정 (프리셋 override > 전역 설정)
+  let transition = transitionEl.value;
+  if (state.transitionOverrides && state.transitionOverrides[slideIdx] !== undefined) {
+    transition = state.transitionOverrides[slideIdx];
+  }
+  const transitionDur = getTransitionDuration(transition);
 
   const current = state.slides[slideIdx];
 
