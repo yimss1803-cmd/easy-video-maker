@@ -61,6 +61,9 @@ resolutionEl.addEventListener('change', () => {
 });
 
 // ----- 이미지 업로드 -----
+const SUPPORTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/bmp'];
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
 uploadArea.addEventListener('click', () => imageInput.click());
 uploadArea.addEventListener('dragover', (e) => {
   e.preventDefault();
@@ -70,7 +73,7 @@ uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag
 uploadArea.addEventListener('drop', (e) => {
   e.preventDefault();
   uploadArea.classList.remove('dragover');
-  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+  const files = Array.from(e.dataTransfer.files);
   handleImages(files);
 });
 imageInput.addEventListener('change', (e) => {
@@ -78,34 +81,160 @@ imageInput.addEventListener('change', (e) => {
   imageInput.value = '';
 });
 
+/**
+ * 토스트 알림 표시
+ */
+function showToast(message, type = 'info') {
+  // 기존 토스트 제거
+  const old = document.getElementById('toast');
+  if (old) old.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'toast';
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => toast.classList.add('show'), 10);
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+
 async function handleImages(files) {
+  if (!files || files.length === 0) {
+    showToast('⚠️ 선택된 파일이 없습니다.', 'warn');
+    return;
+  }
+
+  const results = { success: 0, failed: [], skipped: [] };
+
   for (const file of files) {
+    // 파일 타입 검증
+    const fileName = file.name || '알 수 없는 파일';
+    const fileType = (file.type || '').toLowerCase();
+    const fileExt = fileName.split('.').pop().toLowerCase();
+
+    // HEIC/HEIF (아이폰 사진)
+    if (fileExt === 'heic' || fileExt === 'heif' || fileType.includes('heic') || fileType.includes('heif')) {
+      results.skipped.push({
+        name: fileName,
+        reason: 'HEIC/HEIF 형식은 브라우저에서 지원하지 않습니다. 아이폰 설정 → 카메라 → 포맷 → "높은 호환성"으로 변경하거나, JPG로 변환 후 업로드해주세요.'
+      });
+      continue;
+    }
+
+    // 이미지가 아닌 파일
+    if (!fileType.startsWith('image/') && !['jpg','jpeg','png','webp','gif','bmp'].includes(fileExt)) {
+      results.skipped.push({
+        name: fileName,
+        reason: `이미지 파일이 아닙니다 (${fileType || '알 수 없는 형식'})`
+      });
+      continue;
+    }
+
+    // 크기 검증
+    if (file.size > MAX_FILE_SIZE) {
+      results.skipped.push({
+        name: fileName,
+        reason: `파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(1)}MB). 50MB 이하만 업로드 가능해요.`
+      });
+      continue;
+    }
+
+    if (file.size === 0) {
+      results.skipped.push({ name: fileName, reason: '빈 파일입니다.' });
+      continue;
+    }
+
+    // 이미지 로드 시도
     try {
       const img = await loadImage(file);
       state.slides.push({
-        id: crypto.randomUUID(),
+        id: (crypto.randomUUID && crypto.randomUUID()) || ('id_' + Date.now() + '_' + Math.random()),
         img,
-        name: file.name,
+        name: fileName,
       });
+      results.success++;
     } catch (err) {
-      console.warn('이미지 로드 실패:', file.name, err);
+      console.error('이미지 로드 실패:', fileName, err);
+      results.failed.push({
+        name: fileName,
+        reason: err?.message || '알 수 없는 오류'
+      });
     }
   }
+
   renderSlides();
   drawIdle();
+
+  // 결과 요약 표시
+  if (results.success > 0 && results.failed.length === 0 && results.skipped.length === 0) {
+    showToast(`✅ ${results.success}장의 사진을 추가했어요!`, 'success');
+  } else {
+    let msg = '';
+    if (results.success > 0) msg += `✅ 성공: ${results.success}장<br>`;
+    if (results.failed.length > 0) {
+      msg += `❌ 실패: ${results.failed.length}장<br>`;
+      results.failed.slice(0, 3).forEach(f => {
+        msg += `<small>• ${f.name}: ${f.reason}</small><br>`;
+      });
+    }
+    if (results.skipped.length > 0) {
+      msg += `⚠️ 건너뜀: ${results.skipped.length}장<br>`;
+      results.skipped.slice(0, 3).forEach(s => {
+        msg += `<small>• ${s.name}<br>&nbsp;&nbsp;→ ${s.reason}</small><br>`;
+      });
+    }
+    showToast(msg, results.success > 0 ? 'warn' : 'error');
+  }
 }
 
+/**
+ * 이미지 로드 - createObjectURL 방식 (FileReader보다 안정적, 큰 파일도 OK)
+ */
 function loadImage(file) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = reader.result;
+    if (!(file instanceof Blob)) {
+      reject(new Error('유효하지 않은 파일 객체'));
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+
+    const cleanup = () => {
+      // 이미지 로드가 끝나도 drawImage에 쓰려면 URL이 필요할 수 있지만
+      // img.src가 설정되면 브라우저가 내부적으로 캐시하므로 revoke해도 됨.
+      // 단, 일부 브라우저에서 이슈가 있을 수 있어 약간 지연 후 revoke
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('이미지 로드 시간 초과 (30초). 파일이 너무 크거나 손상됐을 수 있어요.'));
+    }, 30000);
+
+    img.onload = () => {
+      clearTimeout(timeout);
+      if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+        cleanup();
+        reject(new Error('이미지 크기가 0입니다. 손상된 파일일 수 있어요.'));
+        return;
+      }
+      // URL을 유지해서 나중에 canvas drawing에도 사용할 수 있도록 revoke 지연
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      resolve(img);
+    };
+
+    img.onerror = (e) => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(new Error('이미지 디코딩 실패. 지원하지 않는 형식이거나 손상된 파일입니다.'));
+    };
+
+    img.src = url;
   });
 }
 
