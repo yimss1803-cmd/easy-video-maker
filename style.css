@@ -65,6 +65,7 @@ main {
   gap: 12px;
   margin-bottom: 16px;
   font-size: 1.3rem;
+  flex-wrap: wrap;
 }
 
 .step {
@@ -402,6 +403,71 @@ footer {
   padding: 30px 20px;
   color: var(--text-dim);
   font-size: 0.85rem;
+}
+
+/* 슬라이드 카운트 배지 */
+.slide-count {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* 업로드 로딩 */
+.upload-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 20px;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.upload-loading p {
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  text-align: center;
+  max-width: 100%;
+  word-break: break-all;
+}
+
+/* 슬라이드 액션 바 */
+.slides-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn-small {
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+
+.duration-info {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 /* 토스트 알림 */

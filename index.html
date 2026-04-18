@@ -16,18 +16,29 @@
   <main>
     <!-- 1단계: 이미지 업로드 -->
     <section class="card">
-      <h2><span class="step">1</span> 사진 추가하기</h2>
+      <h2>
+        <span class="step">1</span> 사진 추가하기
+        <span id="slideCount" class="slide-count" style="display:none;">0장</span>
+      </h2>
       <div class="upload-area" id="uploadArea">
-        <input type="file" id="imageInput" accept="image/*" multiple hidden />
-        <div class="upload-placeholder">
+        <input type="file" id="imageInput" accept="image/*,.heic,.heif" multiple hidden />
+        <div class="upload-placeholder" id="uploadPlaceholder">
           <div class="upload-icon">📷</div>
           <p><strong>사진을 여기에 끌어다 놓거나 클릭해서 선택하세요</strong></p>
-          <p class="hint">여러 장 한번에 선택 가능 (JPG, PNG, WebP)</p>
+          <p class="hint">여러 장 한번에 선택 가능 · JPG, PNG, WebP, GIF, HEIC(아이폰)</p>
+        </div>
+        <div class="upload-loading" id="uploadLoading" style="display:none;">
+          <div class="spinner"></div>
+          <p id="loadingText">사진 처리 중...</p>
         </div>
       </div>
       <div class="slides-wrapper">
         <div id="slidesList" class="slides-list"></div>
         <p id="emptyHint" class="empty-hint">아직 추가된 사진이 없습니다.</p>
+        <div id="slidesActions" class="slides-actions" style="display:none;">
+          <button id="clearAllBtn" class="btn btn-ghost btn-small">🗑 전체 삭제</button>
+          <span id="totalDuration" class="duration-info"></span>
+        </div>
       </div>
     </section>
 
@@ -174,6 +185,8 @@
     </div>
   </template>
 
-  <script src="app.js"></script>
+  <!-- HEIC(아이폰 사진) 자동 변환을 위한 라이브러리 -->
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js" defer></script>
+  <script src="app.js" defer></script>
 </body>
 </html>

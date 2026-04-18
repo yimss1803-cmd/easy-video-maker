@@ -16,9 +16,16 @@ const state = {
 // ----- DOM 참조 -----
 const $ = (id) => document.getElementById(id);
 const uploadArea    = $('uploadArea');
+const uploadPlaceholder = $('uploadPlaceholder');
+const uploadLoading = $('uploadLoading');
+const loadingText   = $('loadingText');
 const imageInput    = $('imageInput');
 const slidesList    = $('slidesList');
 const emptyHint     = $('emptyHint');
+const slideCount    = $('slideCount');
+const slidesActions = $('slidesActions');
+const clearAllBtn   = $('clearAllBtn');
+const totalDuration = $('totalDuration');
 const durationEl    = $('duration');
 const durationValue = $('durationValue');
 const transitionEl  = $('transition');
@@ -49,6 +56,18 @@ const downloadLink  = $('downloadLink');
 durationValue.textContent = `${durationEl.value}초`;
 durationEl.addEventListener('input', () => {
   durationValue.textContent = `${durationEl.value}초`;
+  updateSlideInfo();
+});
+
+// 전체 삭제 버튼
+clearAllBtn.addEventListener('click', () => {
+  if (state.slides.length === 0) return;
+  if (confirm(`${state.slides.length}장의 사진을 모두 삭제하시겠어요?`)) {
+    state.slides = [];
+    renderSlides();
+    drawIdle();
+    showToast('🗑 모든 사진을 삭제했어요.', 'info');
+  }
 });
 
 resolutionEl.addEventListener('change', () => {
@@ -102,6 +121,45 @@ function showToast(message, type = 'info') {
   }, 5000);
 }
 
+/**
+ * HEIC/HEIF 파일인지 판별
+ */
+function isHeic(file) {
+  const name = (file.name || '').toLowerCase();
+  const type = (file.type || '').toLowerCase();
+  return name.endsWith('.heic') || name.endsWith('.heif')
+      || type.includes('heic') || type.includes('heif');
+}
+
+/**
+ * HEIC → JPEG 변환 (heic2any 라이브러리 사용)
+ */
+async function convertHeic(file) {
+  if (typeof heic2any === 'undefined') {
+    throw new Error('HEIC 변환 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하거나 JPG로 변환 후 다시 시도해주세요.');
+  }
+  const blob = await heic2any({
+    blob: file,
+    toType: 'image/jpeg',
+    quality: 0.9,
+  });
+  // heic2any는 blob 혹은 blob[]을 반환할 수 있음
+  const finalBlob = Array.isArray(blob) ? blob[0] : blob;
+  // File-like 만들기 (name 보존)
+  const newName = file.name.replace(/\.(heic|heif)$/i, '.jpg');
+  return new File([finalBlob], newName, { type: 'image/jpeg' });
+}
+
+function showLoading(text) {
+  uploadPlaceholder.style.display = 'none';
+  uploadLoading.style.display = 'flex';
+  loadingText.textContent = text;
+}
+function hideLoading() {
+  uploadPlaceholder.style.display = 'block';
+  uploadLoading.style.display = 'none';
+}
+
 async function handleImages(files) {
   if (!files || files.length === 0) {
     showToast('⚠️ 선택된 파일이 없습니다.', 'warn');
@@ -109,61 +167,73 @@ async function handleImages(files) {
   }
 
   const results = { success: 0, failed: [], skipped: [] };
+  const total = files.length;
 
-  for (const file of files) {
-    // 파일 타입 검증
-    const fileName = file.name || '알 수 없는 파일';
-    const fileType = (file.type || '').toLowerCase();
-    const fileExt = fileName.split('.').pop().toLowerCase();
+  showLoading(`사진 처리 중... (0/${total})`);
 
-    // HEIC/HEIF (아이폰 사진)
-    if (fileExt === 'heic' || fileExt === 'heif' || fileType.includes('heic') || fileType.includes('heif')) {
-      results.skipped.push({
-        name: fileName,
-        reason: 'HEIC/HEIF 형식은 브라우저에서 지원하지 않습니다. 아이폰 설정 → 카메라 → 포맷 → "높은 호환성"으로 변경하거나, JPG로 변환 후 업로드해주세요.'
-      });
-      continue;
+  try {
+    for (let i = 0; i < files.length; i++) {
+      let file = files[i];
+      const fileName = file.name || '알 수 없는 파일';
+      const fileType = (file.type || '').toLowerCase();
+      const fileExt = fileName.split('.').pop().toLowerCase();
+
+      loadingText.textContent = `사진 처리 중... (${i + 1}/${total}) - ${fileName}`;
+
+      // HEIC 자동 변환
+      if (isHeic(file)) {
+        try {
+          loadingText.textContent = `HEIC 변환 중... (${i + 1}/${total}) - ${fileName}`;
+          file = await convertHeic(file);
+        } catch (err) {
+          console.error('HEIC 변환 실패:', fileName, err);
+          results.failed.push({
+            name: fileName,
+            reason: 'HEIC 변환 실패: ' + (err?.message || '알 수 없는 오류')
+          });
+          continue;
+        }
+      } else if (!fileType.startsWith('image/') && !['jpg','jpeg','png','webp','gif','bmp'].includes(fileExt)) {
+        results.skipped.push({
+          name: fileName,
+          reason: `이미지 파일이 아닙니다 (${fileType || fileExt || '알 수 없는 형식'})`
+        });
+        continue;
+      }
+
+      // 크기 검증
+      if (file.size > MAX_FILE_SIZE) {
+        results.skipped.push({
+          name: fileName,
+          reason: `파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(1)}MB). 50MB 이하만 업로드 가능해요.`
+        });
+        continue;
+      }
+
+      if (file.size === 0) {
+        results.skipped.push({ name: fileName, reason: '빈 파일입니다.' });
+        continue;
+      }
+
+      // 이미지 로드 시도
+      try {
+        const img = await loadImage(file);
+        state.slides.push({
+          id: (crypto.randomUUID && crypto.randomUUID()) || ('id_' + Date.now() + '_' + Math.random()),
+          img,
+          name: fileName,
+        });
+        results.success++;
+      } catch (err) {
+        console.error('이미지 로드 실패:', fileName, err);
+        results.failed.push({
+          name: fileName,
+          reason: err?.message || '알 수 없는 오류'
+        });
+      }
     }
-
-    // 이미지가 아닌 파일
-    if (!fileType.startsWith('image/') && !['jpg','jpeg','png','webp','gif','bmp'].includes(fileExt)) {
-      results.skipped.push({
-        name: fileName,
-        reason: `이미지 파일이 아닙니다 (${fileType || '알 수 없는 형식'})`
-      });
-      continue;
-    }
-
-    // 크기 검증
-    if (file.size > MAX_FILE_SIZE) {
-      results.skipped.push({
-        name: fileName,
-        reason: `파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(1)}MB). 50MB 이하만 업로드 가능해요.`
-      });
-      continue;
-    }
-
-    if (file.size === 0) {
-      results.skipped.push({ name: fileName, reason: '빈 파일입니다.' });
-      continue;
-    }
-
-    // 이미지 로드 시도
-    try {
-      const img = await loadImage(file);
-      state.slides.push({
-        id: (crypto.randomUUID && crypto.randomUUID()) || ('id_' + Date.now() + '_' + Math.random()),
-        img,
-        name: fileName,
-      });
-      results.success++;
-    } catch (err) {
-      console.error('이미지 로드 실패:', fileName, err);
-      results.failed.push({
-        name: fileName,
-        reason: err?.message || '알 수 없는 오류'
-      });
-    }
+  } finally {
+    hideLoading();
   }
 
   renderSlides();
@@ -238,8 +308,29 @@ function loadImage(file) {
   });
 }
 
+function updateSlideInfo() {
+  const n = state.slides.length;
+  if (n === 0) {
+    slideCount.style.display = 'none';
+    slidesActions.style.display = 'none';
+  } else {
+    slideCount.style.display = 'inline-block';
+    slideCount.textContent = `${n}장`;
+    slidesActions.style.display = 'flex';
+
+    // 러닝타임 계산
+    const perSlide = parseFloat(durationEl.value);
+    const totalSec = perSlide * n;
+    const min = Math.floor(totalSec / 60);
+    const sec = Math.round(totalSec % 60);
+    const timeStr = min > 0 ? `${min}분 ${sec}초` : `${sec}초`;
+    totalDuration.textContent = `⏱ 예상 길이: ${timeStr}`;
+  }
+}
+
 function renderSlides() {
   slidesList.innerHTML = '';
+  updateSlideInfo();
   if (state.slides.length === 0) {
     emptyHint.style.display = 'block';
     return;
