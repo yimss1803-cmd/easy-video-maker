@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>쉬운 동영상 만들기 🎬</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🎬 쉬운 동영상 만들기</h1>
+    <p class="subtitle">사진과 음악을 올려서 멋진 동영상을 만들어 보세요!</p>
+  </header>
+
+  <main>
+    <!-- 1단계: 이미지 업로드 -->
+    <section class="card">
+      <h2><span class="step">1</span> 사진 추가하기</h2>
+      <div class="upload-area" id="uploadArea">
+        <input type="file" id="imageInput" accept="image/*" multiple hidden />
+        <div class="upload-placeholder">
+          <div class="upload-icon">📷</div>
+          <p><strong>사진을 여기에 끌어다 놓거나 클릭해서 선택하세요</strong></p>
+          <p class="hint">여러 장 한번에 선택 가능 (JPG, PNG, WebP)</p>
+        </div>
+      </div>
+      <div class="slides-wrapper">
+        <div id="slidesList" class="slides-list"></div>
+        <p id="emptyHint" class="empty-hint">아직 추가된 사진이 없습니다.</p>
+      </div>
+    </section>
+
+    <!-- 2단계: 설정 -->
+    <section class="card">
+      <h2><span class="step">2</span> 동영상 설정</h2>
+      <div class="settings-grid">
+        <label class="setting">
+          <span>사진당 표시 시간</span>
+          <div class="input-row">
+            <input type="range" id="duration" min="1" max="10" step="0.5" value="3" />
+            <span id="durationValue" class="val">3초</span>
+          </div>
+        </label>
+
+        <label class="setting">
+          <span>전환 효과</span>
+          <select id="transition">
+            <option value="none">없음 (바로 전환)</option>
+            <option value="fade" selected>페이드 (부드럽게)</option>
+            <option value="slide">슬라이드 (옆으로)</option>
+            <option value="zoom">줌 (확대)</option>
+          </select>
+        </label>
+
+        <label class="setting">
+          <span>해상도</span>
+          <select id="resolution">
+            <option value="1280x720" selected>720p (1280×720)</option>
+            <option value="1920x1080">1080p (1920×1080)</option>
+            <option value="854x480">480p (854×480)</option>
+            <option value="1080x1080">정사각형 (1080×1080)</option>
+            <option value="1080x1920">세로 (1080×1920)</option>
+          </select>
+        </label>
+
+        <label class="setting">
+          <span>프레임레이트 (FPS)</span>
+          <select id="fps">
+            <option value="24">24 fps (영화)</option>
+            <option value="30" selected>30 fps (표준)</option>
+            <option value="60">60 fps (부드러움)</option>
+          </select>
+        </label>
+
+        <label class="setting">
+          <span>배경색 (빈 공간)</span>
+          <input type="color" id="bgColor" value="#000000" />
+        </label>
+
+        <label class="setting">
+          <span>켄 번즈 효과 (미세한 움직임)</span>
+          <div class="toggle-row">
+            <input type="checkbox" id="kenBurns" checked />
+            <span class="hint">사진이 살짝 움직이고 확대되는 효과</span>
+          </div>
+        </label>
+      </div>
+    </section>
+
+    <!-- 3단계: 음악 -->
+    <section class="card">
+      <h2><span class="step">3</span> 배경음악 (선택)</h2>
+      <div class="audio-row">
+        <input type="file" id="audioInput" accept="audio/*" />
+        <button id="removeAudio" class="btn btn-ghost" style="display:none;">음악 제거</button>
+      </div>
+      <audio id="audioPreview" controls style="display:none; width:100%; margin-top:10px;"></audio>
+      <p class="hint">MP3, WAV, M4A 등 지원. 동영상 길이에 맞춰 자동 조절됩니다.</p>
+    </section>
+
+    <!-- 4단계: 제목 텍스트 -->
+    <section class="card">
+      <h2><span class="step">4</span> 제목 / 자막 (선택)</h2>
+      <div class="settings-grid">
+        <label class="setting">
+          <span>제목 텍스트</span>
+          <input type="text" id="titleText" placeholder="예: 우리의 추억 2026" maxlength="50" />
+        </label>
+        <label class="setting">
+          <span>텍스트 색상</span>
+          <input type="color" id="titleColor" value="#ffffff" />
+        </label>
+        <label class="setting">
+          <span>표시 위치</span>
+          <select id="titlePosition">
+            <option value="bottom" selected>하단</option>
+            <option value="top">상단</option>
+            <option value="center">중앙</option>
+          </select>
+        </label>
+        <label class="setting">
+          <span>모든 사진에 표시</span>
+          <div class="toggle-row">
+            <input type="checkbox" id="titleAllSlides" />
+            <span class="hint">체크 해제 시 첫 번째 사진에만 표시</span>
+          </div>
+        </label>
+      </div>
+    </section>
+
+    <!-- 5단계: 미리보기 & 내보내기 -->
+    <section class="card">
+      <h2><span class="step">5</span> 미리보기 & 저장</h2>
+      <div class="preview-wrapper">
+        <canvas id="previewCanvas" width="1280" height="720"></canvas>
+      </div>
+
+      <div class="actions">
+        <button id="previewBtn" class="btn btn-secondary">▶ 미리보기</button>
+        <button id="stopBtn" class="btn btn-ghost" disabled>⏹ 정지</button>
+        <button id="exportBtn" class="btn btn-primary">🎬 동영상으로 저장</button>
+      </div>
+
+      <div id="progressBox" class="progress-box" style="display:none;">
+        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+        <p id="progressText">준비 중...</p>
+      </div>
+
+      <div id="resultBox" class="result-box" style="display:none;">
+        <h3>✅ 동영상이 완성되었습니다!</h3>
+        <video id="resultVideo" controls></video>
+        <a id="downloadLink" class="btn btn-primary" download="my-video.webm">⬇ 다운로드</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>만든이: AI 개발자 도우미 · 모든 처리는 브라우저에서 안전하게 이루어집니다 🔒</p>
+  </footer>
+
+  <!-- 슬라이드 아이템 템플릿 -->
+  <template id="slideTemplate">
+    <div class="slide-item" draggable="true">
+      <img class="slide-thumb" />
+      <div class="slide-info">
+        <span class="slide-idx"></span>
+      </div>
+      <div class="slide-actions">
+        <button class="btn-icon move-left" title="왼쪽으로">◀</button>
+        <button class="btn-icon move-right" title="오른쪽으로">▶</button>
+        <button class="btn-icon remove" title="삭제">✕</button>
+      </div>
+    </div>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
