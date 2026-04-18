@@ -500,18 +500,43 @@ function drawTitleOverlay(slideIdx) {
 }
 
 // ----- 총 길이 계산 -----
+/**
+ * 전환 효과별 지속 시간 (초)
+ */
+function getTransitionDuration(transition) {
+  const table = {
+    'none': 0,
+    'fade': 0.6,
+    'slide': 0.6,
+    'zoom': 0.6,
+    'morph': 1.0,       // 변신은 길게
+    'motionblur': 0.7,
+    'warp': 0.8,
+    'pixelate': 0.8,
+    'glitch': 0.5,
+    'flash': 0.4,
+    'circle': 0.7,
+  };
+  return table[transition] ?? 0.6;
+}
+
 function getDurations() {
   const perSlide = parseFloat(durationEl.value);
   const transition = transitionEl.value;
-  const transitionDur = transition === 'none' ? 0 : 0.6;
+  const transitionDur = getTransitionDuration(transition);
   const n = state.slides.length;
-  // 총 시간 = 각 슬라이드 표시시간 합 + 전환 시간 * (n-1)
-  // (단, 전환은 슬라이드 표시시간 안에서 겹치게 처리)
   const total = perSlide * n;
   return { perSlide, transitionDur, total, transition };
 }
 
 // ----- 프레임 렌더링 (애니메이션 공통 로직) -----
+/**
+ * easeInOutCubic — 부드러운 이징
+ */
+function ease(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
 /**
  * 시간 t(초)에 해당하는 프레임을 그림
  */
@@ -522,28 +547,48 @@ function renderFrameAt(t) {
   const { perSlide, transitionDur, transition } = getDurations();
   const n = state.slides.length;
   const slideIdx = Math.min(Math.floor(t / perSlide), n - 1);
-  const localT = t - slideIdx * perSlide;  // 현재 슬라이드에서의 시간
+  const localT = t - slideIdx * perSlide;
   const progress = localT / perSlide;
 
-  const cw = canvas.width;
-  const ch = canvas.height;
-
-  // 기본 현재 슬라이드
   const current = state.slides[slideIdx];
 
-  // 전환 처리: 슬라이드 끝 부분의 transitionDur 동안 다음 슬라이드와 섞음
+  // 전환 처리
   if (transition !== 'none' &&
       slideIdx < n - 1 &&
       localT > perSlide - transitionDur) {
 
     const next = state.slides[slideIdx + 1];
-    const tt = (localT - (perSlide - transitionDur)) / transitionDur; // 0~1
+    const ttRaw = (localT - (perSlide - transitionDur)) / transitionDur; // 0~1
+    const tt = ease(ttRaw);
 
-    if (transition === 'fade') {
+    drawTransition(transition, current, next, progress, tt, ttRaw);
+  } else {
+    drawSlide(current, progress, 1);
+  }
+
+  drawTitleOverlay(slideIdx);
+}
+
+/**
+ * 전환 효과별 렌더링
+ * @param {string} type 전환 타입
+ * @param {object} current 현재 슬라이드
+ * @param {object} next 다음 슬라이드
+ * @param {number} progress 현재 슬라이드 내 진행도 (0~1)
+ * @param {number} tt 이징 적용된 전환 진행도 (0~1)
+ * @param {number} ttRaw 원본 전환 진행도 (0~1)
+ */
+function drawTransition(type, current, next, progress, tt, ttRaw) {
+  const cw = canvas.width;
+  const ch = canvas.height;
+
+  switch (type) {
+    case 'fade':
       drawSlide(current, progress, 1 - tt);
       drawSlide(next, 0, tt);
-    } else if (transition === 'slide') {
-      // 현재: 왼쪽으로 이동 / 다음: 오른쪽에서 진입
+      break;
+
+    case 'slide':
       ctx.save();
       ctx.translate(-cw * tt, 0);
       drawSlide(current, progress, 1);
@@ -552,8 +597,9 @@ function renderFrameAt(t) {
       ctx.translate(cw * (1 - tt), 0);
       drawSlide(next, 0, 1);
       ctx.restore();
-    } else if (transition === 'zoom') {
-      // 현재: 축소 페이드아웃 / 다음: 확대 페이드인
+      break;
+
+    case 'zoom':
       ctx.save();
       const s1 = 1 + tt * 0.2;
       ctx.translate(cw / 2, ch / 2);
@@ -561,7 +607,6 @@ function renderFrameAt(t) {
       ctx.translate(-cw / 2, -ch / 2);
       drawSlide(current, progress, 1 - tt);
       ctx.restore();
-
       ctx.save();
       const s2 = 0.8 + tt * 0.2;
       ctx.translate(cw / 2, ch / 2);
@@ -569,12 +614,239 @@ function renderFrameAt(t) {
       ctx.translate(-cw / 2, -ch / 2);
       drawSlide(next, 0, tt);
       ctx.restore();
-    }
-  } else {
-    drawSlide(current, progress, 1);
-  }
+      break;
 
-  drawTitleOverlay(slideIdx);
+    case 'morph': {
+      // 🌊 모프 블렌드: 블러 + 살짝 줌 + 색상 블렌드 = 변신 느낌
+      const blurAmount = Math.sin(tt * Math.PI) * 12; // 가운데에서 블러 최대
+      const currentScale = 1 + tt * 0.08;
+      const nextScale = 1.08 - tt * 0.08;
+
+      ctx.save();
+      ctx.filter = `blur(${blurAmount}px)`;
+      ctx.translate(cw / 2, ch / 2);
+      ctx.scale(currentScale, currentScale);
+      ctx.translate(-cw / 2, -ch / 2);
+      drawSlide(current, progress, 1 - tt);
+      ctx.restore();
+
+      ctx.save();
+      ctx.filter = `blur(${blurAmount}px)`;
+      ctx.translate(cw / 2, ch / 2);
+      ctx.scale(nextScale, nextScale);
+      ctx.translate(-cw / 2, -ch / 2);
+      // 블렌드 모드로 변신 느낌 강화
+      ctx.globalCompositeOperation = tt < 0.5 ? 'source-over' : 'lighter';
+      drawSlide(next, 0, tt);
+      ctx.restore();
+      break;
+    }
+
+    case 'motionblur': {
+      // 💨 모션 블러: 옆으로 흐르면서 여러 겹 잔상 (달리는 느낌)
+      const blurOffset = tt * cw * 0.3;
+      // 현재 이미지: 왼쪽으로 번지며 사라짐
+      ctx.save();
+      ctx.globalAlpha = 1 - tt;
+      for (let i = 0; i < 5; i++) {
+        ctx.save();
+        ctx.globalAlpha = (1 - tt) / (i + 1);
+        ctx.translate(-blurOffset * (i / 4), 0);
+        drawSlide(current, progress, 1);
+        ctx.restore();
+      }
+      ctx.restore();
+      // 다음 이미지: 오른쪽에서 번지며 등장
+      ctx.save();
+      ctx.globalAlpha = tt;
+      const inOffset = (1 - tt) * cw * 0.3;
+      for (let i = 0; i < 5; i++) {
+        ctx.save();
+        ctx.globalAlpha = tt / (i + 1);
+        ctx.translate(inOffset * (i / 4), 0);
+        drawSlide(next, 0, 1);
+        ctx.restore();
+      }
+      ctx.restore();
+      break;
+    }
+
+    case 'warp': {
+      // 🔄 워프: 수평 늘어짐 + 블렌드
+      ctx.save();
+      const currentStretchX = 1 + tt * 2;    // 현재: 옆으로 늘어남
+      const currentStretchY = 1 - tt * 0.3;
+      ctx.translate(cw / 2, ch / 2);
+      ctx.scale(currentStretchX, currentStretchY);
+      ctx.translate(-cw / 2, -ch / 2);
+      ctx.globalAlpha = 1 - tt;
+      drawSlide(current, progress, 1);
+      ctx.restore();
+
+      ctx.save();
+      const nextStretchX = 3 - tt * 2;    // 다음: 늘어진 상태에서 복원
+      const nextStretchY = 0.7 + tt * 0.3;
+      ctx.translate(cw / 2, ch / 2);
+      ctx.scale(nextStretchX, nextStretchY);
+      ctx.translate(-cw / 2, -ch / 2);
+      ctx.globalAlpha = tt;
+      drawSlide(next, 0, 1);
+      ctx.restore();
+      break;
+    }
+
+    case 'pixelate': {
+      // 🌀 픽셀 디졸브: 픽셀 크게 → 페이드 → 픽셀 다시 작게
+      // 가운데에서 픽셀이 최대로 커짐
+      const pxSize = 1 + Math.sin(tt * Math.PI) * 40;
+
+      // 오프스크린 캔버스로 픽셀화
+      if (!state._offCanvas) {
+        state._offCanvas = document.createElement('canvas');
+      }
+      const off = state._offCanvas;
+      off.width = canvas.width;
+      off.height = canvas.height;
+      const offCtx = off.getContext('2d');
+
+      // 먼저 합쳐진 이미지를 off에 그림
+      offCtx.clearRect(0, 0, off.width, off.height);
+      drawSlideTo(offCtx, current, progress, 1 - tt);
+      drawSlideTo(offCtx, next, 0, tt);
+
+      // 저해상도로 축소 후 다시 확대 = 픽셀 효과
+      if (pxSize > 1.5) {
+        const smallW = Math.max(1, Math.floor(cw / pxSize));
+        const smallH = Math.max(1, Math.floor(ch / pxSize));
+        const small = document.createElement('canvas');
+        small.width = smallW; small.height = smallH;
+        const sCtx = small.getContext('2d');
+        sCtx.imageSmoothingEnabled = false;
+        sCtx.drawImage(off, 0, 0, smallW, smallH);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(small, 0, 0, cw, ch);
+        ctx.imageSmoothingEnabled = true;
+      } else {
+        ctx.drawImage(off, 0, 0);
+      }
+      break;
+    }
+
+    case 'glitch': {
+      // ⚡ 글리치: RGB 분리 + 랜덤 슬라이스 어긋남
+      // 기본 레이어: 페이드
+      drawSlide(current, progress, 1 - tt);
+      drawSlide(next, 0, tt);
+
+      // 랜덤 슬라이스 shift (글리치 효과)
+      const glitchIntensity = Math.sin(tt * Math.PI) * 30;
+      const slices = 6;
+      const sliceH = ch / slices;
+
+      for (let i = 0; i < slices; i++) {
+        if (Math.random() < 0.4) {
+          const offset = (Math.random() - 0.5) * glitchIntensity;
+          // 해당 슬라이스만 좌우로 흔들기
+          const srcY = i * sliceH;
+          try {
+            const imgData = ctx.getImageData(0, srcY, cw, sliceH);
+            ctx.putImageData(imgData, offset, srcY);
+          } catch (e) {
+            // CORS-safe이어야 하므로 무시
+          }
+        }
+      }
+
+      // RGB 분리 느낌 (얇은 컬러 오버레이)
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = `rgba(255, 0, 80, ${0.15 * Math.sin(tt * Math.PI)})`;
+      ctx.fillRect(Math.sin(tt * 30) * 8, 0, cw, ch);
+      ctx.fillStyle = `rgba(0, 200, 255, ${0.15 * Math.sin(tt * Math.PI)})`;
+      ctx.fillRect(-Math.sin(tt * 30) * 8, 0, cw, ch);
+      ctx.restore();
+      break;
+    }
+
+    case 'flash': {
+      // 💥 플래시 컷: 0~0.3 현재 페이드아웃 / 0.3~0.5 흰 플래시 / 0.5~1 다음 등장
+      if (ttRaw < 0.5) {
+        drawSlide(current, progress, 1);
+        // 흰색 플래시 점점 강해짐
+        ctx.save();
+        const flashAlpha = ttRaw * 2;
+        ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+        ctx.fillRect(0, 0, cw, ch);
+        ctx.restore();
+      } else {
+        drawSlide(next, 0, 1);
+        // 플래시 사라짐
+        ctx.save();
+        const flashAlpha = (1 - ttRaw) * 2;
+        ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+        ctx.fillRect(0, 0, cw, ch);
+        ctx.restore();
+      }
+      break;
+    }
+
+    case 'circle': {
+      // ⭕ 원형 마스크: 다음 이미지가 중앙에서 원형으로 열림
+      drawSlide(current, progress, 1);
+
+      ctx.save();
+      const maxR = Math.sqrt(cw * cw + ch * ch) / 2;
+      const r = maxR * tt;
+      ctx.beginPath();
+      ctx.arc(cw / 2, ch / 2, r, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      drawSlide(next, 0, 1);
+      ctx.restore();
+
+      // 원 가장자리에 빛나는 링
+      if (r > 0 && r < maxR) {
+        ctx.save();
+        ctx.strokeStyle = `rgba(255, 255, 255, ${1 - tt})`;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.arc(cw / 2, ch / 2, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      break;
+    }
+
+    default:
+      drawSlide(current, progress, 1 - tt);
+      drawSlide(next, 0, tt);
+  }
+}
+
+/**
+ * 지정된 ctx에 슬라이드 그리기 (픽셀 효과용)
+ */
+function drawSlideTo(targetCtx, slide, progress, alpha) {
+  const { img } = slide;
+  const cw = canvas.width;
+  const ch = canvas.height;
+  const ir = img.width / img.height;
+  const cr = cw / ch;
+  let dw, dh;
+  if (ir > cr) { dw = cw; dh = cw / ir; }
+  else         { dh = ch; dw = ch * ir; }
+
+  let scale = 1;
+  if (kenBurnsEl.checked) scale = 1 + 0.08 * progress;
+  const finalW = dw * scale;
+  const finalH = dh * scale;
+  const dx = (cw - finalW) / 2;
+  const dy = (ch - finalH) / 2;
+
+  targetCtx.save();
+  targetCtx.globalAlpha = alpha;
+  targetCtx.drawImage(img, dx, dy, finalW, finalH);
+  targetCtx.restore();
 }
 
 // ----- 미리보기 -----
@@ -789,6 +1061,285 @@ function pickSupportedMime() {
     if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) return m;
   }
   return 'video/webm';
+}
+
+// ============================================================
+// ✨ AI 변신 모드
+// ============================================================
+
+const aiModal = $('aiModal');
+const aiMorphBtn = $('aiMorphBtn');
+const aiModalClose = $('aiModalClose');
+const aiCancelBtn = $('aiCancelBtn');
+const aiGenerateBtn = $('aiGenerateBtn');
+const aiPairSelect = $('aiPairSelect');
+const aiProvider = $('aiProvider');
+const aiApiKey = $('aiApiKey');
+const aiPrompt = $('aiPrompt');
+const aiDuration = $('aiDuration');
+const aiProgress = $('aiProgress');
+const aiProgressText = $('aiProgressText');
+const aiProgressHint = $('aiProgressHint');
+const aiResult = $('aiResult');
+const aiResultVideo = $('aiResultVideo');
+const aiDownloadLink = $('aiDownloadLink');
+const aiNewBtn = $('aiNewBtn');
+
+// localStorage에서 API 키 복원
+if (localStorage.getItem('aiApiKey')) {
+  aiApiKey.value = localStorage.getItem('aiApiKey');
+}
+if (localStorage.getItem('aiProvider')) {
+  aiProvider.value = localStorage.getItem('aiProvider');
+}
+
+function openAiModal() {
+  if (state.slides.length < 2) {
+    showToast('⚠️ AI 변신 모드는 <strong>2장 이상의 사진</strong>이 필요합니다.', 'warn');
+    return;
+  }
+  // 이미지 쌍 드롭다운 업데이트
+  aiPairSelect.innerHTML = '<option value="">-- 이미지 쌍을 선택하세요 --</option>';
+  for (let i = 0; i < state.slides.length - 1; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${i + 1}번 → ${i + 2}번 (${state.slides[i].name} → ${state.slides[i + 1].name})`;
+    aiPairSelect.appendChild(opt);
+  }
+  if (state.slides.length >= 2) aiPairSelect.value = '0';
+
+  aiModal.style.display = 'flex';
+  aiResult.style.display = 'none';
+  aiProgress.style.display = 'none';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAiModal() {
+  aiModal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+aiMorphBtn.addEventListener('click', openAiModal);
+aiModalClose.addEventListener('click', closeAiModal);
+aiCancelBtn.addEventListener('click', closeAiModal);
+aiModal.querySelector('.modal-backdrop').addEventListener('click', closeAiModal);
+
+aiNewBtn.addEventListener('click', () => {
+  aiResult.style.display = 'none';
+  aiProgress.style.display = 'none';
+});
+
+/**
+ * Canvas에서 이미지를 Blob으로 변환
+ */
+function slideToBlob(slide, mimeType = 'image/jpeg', quality = 0.92) {
+  return new Promise((resolve, reject) => {
+    const off = document.createElement('canvas');
+    off.width = slide.img.naturalWidth;
+    off.height = slide.img.naturalHeight;
+    const offCtx = off.getContext('2d');
+    offCtx.drawImage(slide.img, 0, 0);
+    off.toBlob(
+      (blob) => blob ? resolve(blob) : reject(new Error('Blob 변환 실패')),
+      mimeType,
+      quality
+    );
+  });
+}
+
+/**
+ * AI 영상 생성 — 서비스별 라우팅
+ */
+async function generateAiMorph() {
+  const pairIdx = parseInt(aiPairSelect.value, 10);
+  if (isNaN(pairIdx)) {
+    showToast('⚠️ 이미지 쌍을 선택해주세요.', 'warn');
+    return;
+  }
+  const apiKey = aiApiKey.value.trim();
+  if (!apiKey) {
+    showToast('⚠️ API 키를 입력해주세요.', 'warn');
+    return;
+  }
+
+  // 저장
+  localStorage.setItem('aiApiKey', apiKey);
+  localStorage.setItem('aiProvider', aiProvider.value);
+
+  const startSlide = state.slides[pairIdx];
+  const endSlide = state.slides[pairIdx + 1];
+  const prompt = aiPrompt.value.trim() ||
+    `Smooth morphing transition from first image to second image, cinematic, high quality`;
+  const duration = parseInt(aiDuration.value, 10);
+  const provider = aiProvider.value;
+
+  // UI 상태
+  aiResult.style.display = 'none';
+  aiProgress.style.display = 'flex';
+  aiGenerateBtn.disabled = true;
+  aiProgressText.textContent = '이미지 준비 중...';
+  aiProgressHint.textContent = '이 창을 닫지 마세요.';
+
+  try {
+    // 이미지를 Blob으로 변환
+    const [startBlob, endBlob] = await Promise.all([
+      slideToBlob(startSlide),
+      slideToBlob(endSlide),
+    ]);
+
+    aiProgressText.textContent = 'AI 서비스에 요청 중...';
+
+    let videoUrl;
+    if (provider === 'fal') {
+      videoUrl = await generateViaFal(apiKey, startBlob, endBlob, prompt, duration);
+    } else if (provider === 'replicate') {
+      videoUrl = await generateViaReplicate(apiKey, startBlob, endBlob, prompt, duration);
+    } else if (provider === 'runway') {
+      videoUrl = await generateViaRunway(apiKey, startBlob, endBlob, prompt, duration);
+    } else {
+      throw new Error('아직 지원되지 않는 서비스입니다. fal.ai를 사용해보세요.');
+    }
+
+    // 결과 표시
+    aiResultVideo.src = videoUrl;
+    aiDownloadLink.href = videoUrl;
+    aiDownloadLink.download = `ai-morph-${Date.now()}.mp4`;
+    aiProgress.style.display = 'none';
+    aiResult.style.display = 'block';
+    showToast('✅ AI 변신 영상이 완성됐어요!', 'success');
+
+  } catch (err) {
+    console.error('AI 변신 실패:', err);
+    aiProgress.style.display = 'none';
+    showToast(`❌ AI 변신 실패<br><small>${err.message || err}</small>`, 'error');
+  } finally {
+    aiGenerateBtn.disabled = false;
+  }
+}
+
+aiGenerateBtn.addEventListener('click', generateAiMorph);
+
+/**
+ * fal.ai - Kling v1.6 pro / Luma 같은 모델로 first-last frame 영상 생성
+ * 참고: https://fal.ai/models (kling-video, luma-dream-machine 등)
+ */
+async function generateViaFal(apiKey, startBlob, endBlob, prompt, duration) {
+  aiProgressText.textContent = '이미지 업로드 중 (fal.ai)...';
+
+  // 1) 이미지 업로드
+  const startUrl = await falUploadBlob(apiKey, startBlob);
+  const endUrl = await falUploadBlob(apiKey, endBlob);
+
+  aiProgressText.textContent = 'AI 영상 생성 요청 중...';
+
+  // 2) kling 1.6 pro (first-last) 모델 호출
+  const submitRes = await fetch('https://queue.fal.run/fal-ai/kling-video/v1.6/pro/image-to-video', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prompt,
+      image_url: startUrl,
+      tail_image_url: endUrl,
+      duration: duration >= 8 ? '10' : '5',
+      aspect_ratio: '16:9',
+    }),
+  });
+
+  if (!submitRes.ok) {
+    const errText = await submitRes.text();
+    throw new Error(`fal.ai 요청 실패 (${submitRes.status}): ${errText.slice(0, 200)}`);
+  }
+
+  const submitData = await submitRes.json();
+  const requestId = submitData.request_id;
+
+  if (!requestId) {
+    throw new Error('fal.ai request_id가 없습니다. 응답: ' + JSON.stringify(submitData).slice(0, 200));
+  }
+
+  aiProgressText.textContent = 'AI가 영상을 생성 중입니다...';
+  aiProgressHint.textContent = '약 1~3분 소요됩니다. 기다려주세요.';
+
+  // 3) 폴링
+  const statusUrl = `https://queue.fal.run/fal-ai/kling-video/requests/${requestId}/status`;
+  const resultUrl = `https://queue.fal.run/fal-ai/kling-video/requests/${requestId}`;
+
+  let attempts = 0;
+  const maxAttempts = 120; // 6분
+
+  while (attempts < maxAttempts) {
+    await new Promise(r => setTimeout(r, 3000));
+    attempts++;
+
+    const statusRes = await fetch(statusUrl, {
+      headers: { 'Authorization': `Key ${apiKey}` },
+    });
+    if (!statusRes.ok) continue;
+    const status = await statusRes.json();
+
+    aiProgressText.textContent = `AI 생성 중... (${attempts * 3}초 경과)`;
+
+    if (status.status === 'COMPLETED') {
+      const resultRes = await fetch(resultUrl, {
+        headers: { 'Authorization': `Key ${apiKey}` },
+      });
+      const result = await resultRes.json();
+      const videoUrl = result?.video?.url || result?.data?.video?.url;
+      if (!videoUrl) {
+        throw new Error('영상 URL을 찾을 수 없습니다. 결과: ' + JSON.stringify(result).slice(0, 200));
+      }
+      return videoUrl;
+    }
+
+    if (status.status === 'FAILED' || status.status === 'ERROR') {
+      throw new Error('AI 생성 실패: ' + (status.error || JSON.stringify(status)));
+    }
+  }
+
+  throw new Error('시간 초과 (6분). 잠시 후 다시 시도해주세요.');
+}
+
+async function falUploadBlob(apiKey, blob) {
+  // fal storage API로 업로드
+  const initRes = await fetch('https://rest.alpha.fal.ai/storage/upload/initiate', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      file_name: `image_${Date.now()}.jpg`,
+      content_type: blob.type || 'image/jpeg',
+    }),
+  });
+  if (!initRes.ok) throw new Error('fal 업로드 초기화 실패');
+  const initData = await initRes.json();
+
+  const putRes = await fetch(initData.upload_url, {
+    method: 'PUT',
+    headers: { 'Content-Type': blob.type || 'image/jpeg' },
+    body: blob,
+  });
+  if (!putRes.ok) throw new Error('fal 이미지 업로드 실패');
+
+  return initData.file_url;
+}
+
+/**
+ * Replicate - 간단히 안내만 (CORS 이슈로 직접 호출 제한)
+ */
+async function generateViaReplicate(apiKey, startBlob, endBlob, prompt, duration) {
+  throw new Error('Replicate는 CORS 정책으로 브라우저에서 직접 호출이 막혀있어요. fal.ai를 사용하거나 별도 프록시 서버가 필요합니다.');
+}
+
+/**
+ * Runway ML - 동일
+ */
+async function generateViaRunway(apiKey, startBlob, endBlob, prompt, duration) {
+  throw new Error('Runway는 브라우저 직접 호출을 막아두었어요. fal.ai를 사용하거나 별도 프록시 서버가 필요합니다.');
 }
 
 // 초기 렌더

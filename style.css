@@ -470,6 +470,229 @@ footer {
   font-weight: 500;
 }
 
+/* AI 변신 버튼 */
+.btn-ai {
+  background: linear-gradient(135deg, #ec4899, #8b5cf6, #6366f1);
+  background-size: 200% 200%;
+  color: white;
+  border: none;
+  animation: aiGlow 3s ease infinite;
+  position: relative;
+}
+
+.btn-ai:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.5);
+}
+
+@keyframes aiGlow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* 모달 */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+}
+
+.modal-content {
+  position: relative;
+  background: var(--card);
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 720px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: var(--card-hover);
+  border: none;
+  color: var(--text);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.modal-close:hover { background: var(--danger); }
+
+.modal-content h2 {
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 1.8rem;
+  margin-bottom: 6px;
+}
+
+.modal-subtitle {
+  color: var(--text-dim);
+  margin-bottom: 24px;
+}
+
+.ai-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.ai-info-card {
+  background: var(--card-hover);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.ai-info-icon { font-size: 1.8rem; margin-bottom: 8px; }
+
+.ai-info-card h3 {
+  font-size: 1rem;
+  margin-bottom: 6px;
+}
+
+.ai-info-card p, .ai-info-card li {
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.ai-info-card ul {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 6px;
+}
+
+.ai-info-card ul li {
+  padding: 3px 0;
+}
+
+.ai-info-card a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.ai-info-card a:hover { text-decoration: underline; }
+
+.ai-config {
+  background: var(--card-hover);
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+}
+
+.ai-config h3 {
+  font-size: 1.05rem;
+  margin-bottom: 14px;
+}
+
+.ai-config .setting {
+  margin-bottom: 14px;
+}
+
+.ai-config .setting:last-child { margin-bottom: 0; }
+
+.ai-config input[type="password"],
+.ai-config input[type="text"],
+.ai-config select {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.modal-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 20px;
+  font-size: 0.88rem;
+}
+
+.modal-warning strong { display: block; margin-bottom: 6px; color: #fbbf24; }
+.modal-warning ul { padding-left: 20px; color: var(--text-dim); }
+.modal-warning li { margin: 4px 0; line-height: 1.5; }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ai-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 30px 20px;
+  background: var(--card-hover);
+  border-radius: 12px;
+  margin-top: 20px;
+}
+
+.ai-progress p { text-align: center; }
+
+.ai-result {
+  margin-top: 20px;
+  padding: 20px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid var(--success);
+  border-radius: 12px;
+}
+
+.ai-result h3 {
+  color: var(--success);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.ai-result video {
+  width: 100%;
+  max-height: 360px;
+  border-radius: 8px;
+  background: #000;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 600px) {
+  .modal-content {
+    padding: 20px;
+    max-height: 95vh;
+  }
+  .ai-info-grid { grid-template-columns: 1fr; }
+}
+
 /* 토스트 알림 */
 .toast {
   position: fixed;

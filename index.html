@@ -55,12 +55,23 @@
         </label>
 
         <label class="setting">
-          <span>전환 효과</span>
+          <span>전환 효과 ✨</span>
           <select id="transition">
-            <option value="none">없음 (바로 전환)</option>
-            <option value="fade" selected>페이드 (부드럽게)</option>
-            <option value="slide">슬라이드 (옆으로)</option>
-            <option value="zoom">줌 (확대)</option>
+            <optgroup label="기본">
+              <option value="none">없음 (바로 전환)</option>
+              <option value="fade" selected>페이드 (부드럽게)</option>
+              <option value="slide">슬라이드 (옆으로)</option>
+              <option value="zoom">줌 (확대)</option>
+            </optgroup>
+            <optgroup label="🎨 변신 효과">
+              <option value="morph">🌊 모프 블렌드 (변신 느낌)</option>
+              <option value="motionblur">💨 모션 블러 (달리는 느낌)</option>
+              <option value="warp">🔄 워프 (고무처럼 늘어남)</option>
+              <option value="pixelate">🌀 픽셀 디졸브 (SF 변신)</option>
+              <option value="glitch">⚡ 글리치 (디지털 왜곡)</option>
+              <option value="flash">💥 플래시 컷 (번쩍임)</option>
+              <option value="circle">⭕ 원형 마스크 (동그랗게)</option>
+            </optgroup>
           </select>
         </label>
 
@@ -151,6 +162,9 @@
         <button id="previewBtn" class="btn btn-secondary">▶ 미리보기</button>
         <button id="stopBtn" class="btn btn-ghost" disabled>⏹ 정지</button>
         <button id="exportBtn" class="btn btn-primary">🎬 동영상으로 저장</button>
+        <button id="aiMorphBtn" class="btn btn-ai" title="AI가 두 이미지 사이의 자연스러운 변신 영상을 생성합니다">
+          ✨ AI 변신 모드
+        </button>
       </div>
 
       <div id="progressBox" class="progress-box" style="display:none;">
@@ -169,6 +183,108 @@
   <footer>
     <p>만든이: AI 개발자 도우미 · 모든 처리는 브라우저에서 안전하게 이루어집니다 🔒</p>
   </footer>
+
+  <!-- AI 변신 모드 모달 -->
+  <div id="aiModal" class="modal" style="display:none;">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <button class="modal-close" id="aiModalClose" aria-label="닫기">✕</button>
+      <h2>✨ AI 변신 모드</h2>
+      <p class="modal-subtitle">두 이미지 사이를 AI가 자연스럽게 이어주는 변신 영상을 만들어요!</p>
+
+      <div class="ai-info-grid">
+        <div class="ai-info-card">
+          <div class="ai-info-icon">🎬</div>
+          <h3>어떻게 동작하나요?</h3>
+          <p>선택한 두 이미지를 시작/끝 프레임으로 사용해서, AI가 그 사이의 부드러운 변신 애니메이션을 생성합니다. 차→차, 얼굴→얼굴, 풍경→풍경 등 모두 가능!</p>
+        </div>
+        <div class="ai-info-card">
+          <div class="ai-info-icon">⚙️</div>
+          <h3>필요한 것</h3>
+          <p>AI 영상 생성 서비스의 API 키가 필요해요. 아래 중 하나를 선택하세요:</p>
+          <ul>
+            <li><a href="https://runwayml.com/" target="_blank">Runway ML</a> (Gen-3/4)</li>
+            <li><a href="https://kling.kuaishou.com/en" target="_blank">Kling AI</a></li>
+            <li><a href="https://pixverse.ai/" target="_blank">Pixverse</a></li>
+            <li><a href="https://fal.ai/" target="_blank">fal.ai</a> (통합 API)</li>
+            <li><a href="https://replicate.com/" target="_blank">Replicate</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="ai-config">
+        <h3>🔧 AI 설정</h3>
+
+        <label class="setting">
+          <span>사용할 이미지 쌍 선택</span>
+          <select id="aiPairSelect">
+            <option value="">-- 이미지 쌍을 선택하세요 --</option>
+          </select>
+        </label>
+
+        <label class="setting">
+          <span>AI 서비스</span>
+          <select id="aiProvider">
+            <option value="fal">fal.ai (추천, 여러 모델 지원)</option>
+            <option value="replicate">Replicate</option>
+            <option value="runway">Runway ML</option>
+            <option value="custom">직접 엔드포인트 입력</option>
+          </select>
+        </label>
+
+        <label class="setting">
+          <span>API Key</span>
+          <input type="password" id="aiApiKey" placeholder="sk-... 또는 fal-... (브라우저에만 저장)" />
+          <span class="hint">🔒 API 키는 브라우저 localStorage에만 저장되며, 서버로 전송되지 않습니다.</span>
+        </label>
+
+        <label class="setting">
+          <span>변신 스타일 설명 (프롬프트)</span>
+          <input type="text" id="aiPrompt" placeholder="예: A red car smoothly transforms into a blue car, cinematic" />
+          <span class="hint">영어로 작성하면 품질이 더 좋아요. 비워두면 자동 생성됩니다.</span>
+        </label>
+
+        <label class="setting">
+          <span>영상 길이</span>
+          <select id="aiDuration">
+            <option value="3">3초 (짧게)</option>
+            <option value="5" selected>5초 (추천)</option>
+            <option value="8">8초 (길게)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="modal-warning">
+        <strong>⚠️ 참고사항</strong>
+        <ul>
+          <li>AI 생성은 <strong>크레딧/비용이 소모</strong>됩니다 (보통 1영상당 $0.1~$1)</li>
+          <li>생성에 <strong>30초~3분</strong>이 걸릴 수 있어요</li>
+          <li>일부 AI 서비스는 <strong>CORS 정책</strong>으로 브라우저에서 직접 호출이 막힐 수 있습니다 → 이 경우 "직접 엔드포인트" 모드로 프록시 서버 사용 필요</li>
+          <li>생성된 영상은 <strong>자동으로 다운로드</strong>되며, 수동으로 타임라인에 넣어서 사용하세요</li>
+        </ul>
+      </div>
+
+      <div class="modal-actions">
+        <button id="aiCancelBtn" class="btn btn-ghost">취소</button>
+        <button id="aiGenerateBtn" class="btn btn-primary">🚀 변신 영상 생성</button>
+      </div>
+
+      <div id="aiProgress" class="ai-progress" style="display:none;">
+        <div class="spinner"></div>
+        <p id="aiProgressText">생성 중...</p>
+        <p class="hint" id="aiProgressHint">이 창을 닫지 마세요.</p>
+      </div>
+
+      <div id="aiResult" class="ai-result" style="display:none;">
+        <h3>✅ 완성!</h3>
+        <video id="aiResultVideo" controls></video>
+        <div class="modal-actions">
+          <a id="aiDownloadLink" class="btn btn-primary" download>⬇ 다운로드</a>
+          <button id="aiNewBtn" class="btn btn-ghost">새로 만들기</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- 슬라이드 아이템 템플릿 -->
   <template id="slideTemplate">
